@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IPL Match Win Predictor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <section class="workspace">
+      <form class="panel" method="post">
+        <div class="title-row">
+          <div>
+            <p class="eyebrow">Second innings model</p>
+            <h1>IPL Win Predictor</h1>
+          </div>
+          <span class="status-dot"></span>
+        </div>
+
+        <div class="grid">
+          <label>Batting Team
+            <select name="batting_team" required>
+              {% for team in teams %}
+              <option value="{{ team }}" {% if form_data.batting_team == team %}selected{% endif %}>{{ team }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>Bowling Team
+            <select name="bowling_team" required>
+              {% for team in teams %}
+              <option value="{{ team }}" {% if form_data.bowling_team == team %}selected{% endif %}>{{ team }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>Venue
+            <select name="venue">
+              {% for venue in venues %}
+              <option value="{{ venue }}" {% if form_data.venue == venue %}selected{% endif %}>{{ venue }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>Target
+            <input name="target_score" type="number" min="1" max="300" value="{{ form_data.target_score }}" required>
+          </label>
+
+          <label>Current Score
+            <input name="score" type="number" min="0" max="330" value="{{ form_data.score }}" required>
+          </label>
+
+          <label>Overs Completed
+            <input name="overs_completed" type="number" min="0" max="20" step="0.1" value="{{ form_data.overs_completed }}" required>
+          </label>
+
+          <label>Wickets Lost
+            <input name="wickets_lost" type="number" min="0" max="10" value="{{ form_data.wickets_lost }}" required>
+          </label>
+        </div>
+
+        <button type="submit">Predict Probability</button>
+      </form>
+
+      <aside class="result-panel">
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <p class="eyebrow">Model output</p>
+        <div class="scoreline">
+          <span>{{ result.win_probability }}%</span>
+          <small>win probability</small>
+        </div>
+        <div class="bar">
+          <div class="win" style="width: {{ result.win_probability }}%"></div>
+          <div class="lose" style="width: {{ result.lose_probability }}%"></div>
+        </div>
+        <div class="prob-grid">
+          <div><strong>{{ result.win_probability }}%</strong><span>Win</span></div>
+          <div><strong>{{ result.lose_probability }}%</strong><span>Lose</span></div>
+        </div>
+        {% if result.decision_note %}
+        <div class="decision-note">{{ result.decision_note }}</div>
+        {% endif %}
+        <dl>
+          <div><dt>Runs left</dt><dd>{{ result.features.runs_left }}</dd></div>
+          <div><dt>Balls left</dt><dd>{{ result.features.balls_left }}</dd></div>
+          <div><dt>Required RR</dt><dd>{{ "%.2f"|format(result.features.required_run_rate) }}</dd></div>
+          <div><dt>Pressure</dt><dd>{{ "%.2f"|format(result.features.pressure_index) }}</dd></div>
+          <div><dt>Chase progress</dt><dd>{{ "%.1f"|format(result.features.chase_progress * 100) }}%</dd></div>
+        </dl>
+        {% else %}
+        <p class="eyebrow">Ready for a chase state</p>
+        <div class="empty-state">Train the model, enter the match situation, and the app will return calibrated win and loss probabilities.</div>
+        {% endif %}
+      </aside>
+    </section>
+  </main>
+</body>
+</html>
