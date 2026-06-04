@@ -1,33 +1,49 @@
 # IPL Match Win Predictor
 
-Predict the probability of the batting team winning an IPL match during the second innings. The output is a win probability from 0 to 100 percent and a loss probability for the same chase state.
+An end-to-end machine learning project that predicts the probability of a batting team winning an IPL match during the second innings. The project uses IPL ball-by-ball data, cricket-specific feature engineering, model comparison, explainability, and a Flask web application.
 
-This project is built for an internship interview discussion: it focuses on feature engineering, clean evaluation, model comparison, explainability, and a simple Flask deployment.
+## Key Highlights
+
+- Predicts live win probability between 0 and 100 percent.
+- Uses second-innings ball-by-ball IPL data.
+- Engineers cricket-specific features such as runs left, balls left, wickets remaining, current run rate, required run rate, pressure index, chase progress, resource pressure, and run-rate gap.
+- Compares Logistic Regression, Random Forest, XGBoost, and optional LightGBM.
+- Evaluates models using Accuracy, Precision, Recall, F1 Score, and ROC-AUC.
+- Uses match-level train-test splitting to reduce leakage from ball-by-ball records.
+- Includes feature importance and SHAP-based explainability when dependencies are available.
+- Deploys the final model with a clean Flask interface.
+- Handles cricket terminal states such as all wickets lost, target reached, and no balls remaining.
 
 ## Problem Statement
 
-Given the live state of an IPL chase, predict:
+Given a live second-innings IPL chase state, predict:
 
 ```text
 P(second-innings batting team wins | current match state)
 ```
 
-The model is trained on ball-by-ball second-innings states. If the batting team eventually wins the match, the target is 1. Otherwise, the target is 0.
+The output is:
+
+- Win probability
+- Lose probability
+- Visual probability bar
+- Important engineered chase features
 
 ## Dataset
 
 Use IPL ball-by-ball data with two CSV files:
 
-- `data/raw/matches.csv`: match metadata such as match id, winner, venue, teams, and toss information.
-- `data/raw/deliveries.csv`: every delivery in every match, including inning, batting team, bowling team, over, ball, runs, extras, wickets, and dismissal type.
+- `matches.csv`: match metadata such as match id, winner, venue, teams, and toss information.
+- `deliveries.csv`: ball-by-ball details such as innings, batting team, bowling team, runs, extras, overs, balls, and wickets.
 
-A common source is the Kaggle IPL dataset containing `matches.csv` and `deliveries.csv`. Put both files in `data/raw/`.
+Place both files here:
 
-The project expects these columns:
+```text
+data/raw/matches.csv
+data/raw/deliveries.csv
+```
 
-- From `matches.csv`: `id`, `winner`, `venue`
-- From `deliveries.csv`: `match_id`, `inning`, `batting_team`, `bowling_team`, `over`, `ball`, `total_runs`, `batsman_runs`, `player_dismissed`
-- Optional but useful: `extras_type`, `dismissal_kind`
+These raw CSV files are intentionally ignored by Git because datasets can be large and may have redistribution restrictions.
 
 ## Target Variable
 
@@ -37,198 +53,54 @@ For every second-innings ball state:
 batting_team_won = 1 if second_innings_batting_team == match_winner else 0
 ```
 
-This is not leakage because the final result is used only as the label. The features are built only from information available up to the current ball.
-
-## Data Cleaning and Preprocessing
-
-Implemented in `src/data_loader.py` and `src/features.py`.
-
-- Standardizes old team names, for example Delhi Daredevils to Delhi Capitals.
-- Uses only second innings for prediction rows.
-- Computes target score from first innings total plus one.
-- Counts only legal deliveries for balls left when `extras_type` is available.
-- Excludes non-standard dismissal noise such as retired hurt when possible.
-- Drops invalid rows with missing venue, impossible balls left, impossible wickets, or infinite run-rate values.
-- Uses median imputation and scaling for numeric features.
-- Uses one-hot encoding for categorical features.
+The final result is used only as the label. Features are computed from information available at the current ball, which helps avoid future-information leakage.
 
 ## Feature Engineering
 
-| Feature | Source | Why it helps | Expected impact |
-|---|---|---|---|
-| `runs_left` | `target_score - current_score` | Measures remaining chase demand. | Higher runs left usually lowers win probability. |
-| `balls_left` | Legal balls remaining from 120. | Captures time/resource availability. | More balls left usually increases win probability. |
-| `wickets_remaining` | 10 minus cumulative wickets. | Captures batting resources and risk capacity. | More wickets usually increases win probability. |
-| `current_run_rate` | Current score per over. | Shows scoring momentum so far. | Higher current rate often increases win probability. |
-| `required_run_rate` | Runs left per over remaining. | Shows future scoring pressure. | Higher required rate usually lowers win probability. |
-| `target_score` | First innings score + 1. | Contextualizes whether the chase is small or large. | Larger targets are harder, but effect depends on current state. |
-| `overs_completed` | Legal balls bowled / 6. | Helps model phase of innings. | Late innings magnify each run and wicket. |
-| `run_rate_gap` | Required RR minus current RR. | Directly compares demand versus scoring speed. | Larger gap usually lowers win probability. |
-| `pressure_index` | Required RR, wickets lost, overs left. | Cricket-specific interaction feature for chase stress. | Higher pressure usually lowers win probability. |
-| `resource_pressure` | Runs left per wicket remaining. | Measures how much work each remaining wicket must support. | Higher value usually lowers win probability. |
-| `chase_progress` | Current score divided by target. | Shows how much of the chase has already been completed. | Higher value usually increases win probability. |
-| `venue` | Match metadata. | Some grounds are easier for chasing or high scoring. | Direction depends on venue history. |
-| `batting_team`, `bowling_team` | Ball data. | Captures team-level historical strength. | Direction depends on team matchup. |
+| Feature | Why it matters |
+|---|---|
+| `runs_left` | Measures remaining chase demand. |
+| `balls_left` | Measures time/resources left in the innings. |
+| `wickets_remaining` | Captures batting resources and risk capacity. |
+| `current_run_rate` | Shows scoring pace so far. |
+| `required_run_rate` | Shows future scoring pressure. |
+| `run_rate_gap` | Compares required rate with current scoring speed. |
+| `pressure_index` | Combines required run rate, wickets lost, and overs remaining. |
+| `resource_pressure` | Measures runs left per wicket remaining. |
+| `chase_progress` | Measures how much of the target has already been achieved. |
+| `target_score` | Adds match context for chase difficulty. |
+| `venue` | Captures ground-specific scoring/chasing patterns. |
+| `batting_team`, `bowling_team` | Captures team-level historical behavior. |
 
-## Exploratory Data Analysis
+## ML Workflow
 
-Run:
-
-```bash
-python scripts/run_eda.py
-```
-
-It creates charts in `artifacts/`:
-
-- `class_balance.png`: whether winning and losing chase states are balanced.
-- `required_run_rate_trend.png`: how required rate changes across overs for wins and losses.
-- `pressure_index_boxplot.png`: whether pressure is higher in failed chases.
-- `correlation_heatmap.png`: relationships among numeric features.
-
-Expected trends to discuss:
-
-- Winning chases usually keep required run rate controlled.
-- Losing chases often show a widening run-rate gap after the middle overs.
-- Wickets remaining matters more late in the innings because there is less recovery time.
-- Ball states are not independent; one match contributes many rows, so evaluation must split by match.
-
-## Machine Learning Pipeline
-
-The training script performs:
-
-1. Load raw data.
-2. Validate required columns.
-3. Clean team names and match states.
-4. Build second-innings features.
-5. Split train and test by `match_id`.
-6. Preprocess numeric and categorical columns.
-7. Train multiple models.
-8. Evaluate metrics.
-9. Save final model and reports.
-
-Run:
-
-```bash
-python scripts/train.py
-```
-
-Saved artifacts:
-
-- `artifacts/ipl_win_pipeline.joblib`
-- `artifacts/metrics.csv`
-- `artifacts/feature_importance.csv`
-- `artifacts/shap_summary.png` when SHAP succeeds
+1. Load `matches.csv` and `deliveries.csv`.
+2. Clean team names and validate required columns.
+3. Build second-innings ball-state features.
+4. Split train/test data by `match_id` to reduce leakage.
+5. Preprocess numeric and categorical features.
+6. Train multiple candidate models.
+7. Evaluate using classification and ranking metrics.
+8. Save the best model pipeline.
+9. Generate feature importance and SHAP summary when possible.
+10. Serve predictions through Flask.
 
 ## Models Compared
 
-### Logistic Regression
+- Logistic Regression: simple, fast, and interpretable baseline.
+- Random Forest: handles nonlinear feature interactions.
+- XGBoost: strong structured-data model for tabular ML.
+- LightGBM: optional fast gradient boosting model.
 
-Advantages:
-
-- Interpretable baseline.
-- Fast to train.
-- Useful for explaining feature direction.
-
-Disadvantages:
-
-- Struggles with nonlinear interactions unless engineered manually.
-- May underfit late-over pressure patterns.
-
-### Random Forest
-
-Advantages:
-
-- Captures nonlinear feature interactions.
-- Robust to noisy tabular data.
-- Provides feature importance.
-
-Disadvantages:
-
-- Probabilities can be less calibrated.
-- Larger and less directly interpretable than logistic regression.
-
-### XGBoost
-
-Advantages:
-
-- Strong performance on structured tabular data.
-- Captures complex interactions.
-- Often high ROC-AUC with careful regularization.
-
-Disadvantages:
-
-- More hyperparameters.
-- Needs explainability tools for clear interpretation.
-
-### LightGBM
-
-Advantages:
-
-- Fast gradient boosting.
-- Strong for larger tabular datasets.
-
-Disadvantages:
-
-- Optional dependency.
-- Can overfit if not validated carefully.
-
-The final model is selected by highest ROC-AUC, because this is a probability-ranking problem. In an interview, also discuss calibration if the exact probability value is business-critical.
+The final model is selected using ROC-AUC because this is a probability-ranking problem.
 
 ## Evaluation Metrics
 
-- Accuracy: Overall fraction of correct win/loss classifications.
-- Precision: When the model predicts a likely chase win, how often was it correct?
-- Recall: Among actual successful chases, how many did the model identify?
-- F1 Score: Balance between precision and recall.
-- ROC-AUC: How well the model ranks winning chase states above losing chase states across thresholds.
-
-Important: this project uses `GroupShuffleSplit` by match id. That prevents balls from the same match appearing in both train and test.
-
-## Explainability
-
-The project includes:
-
-- Global feature importance saved to `artifacts/feature_importance.csv`.
-- SHAP summary plot saved to `artifacts/shap_summary.png` when supported by the installed model stack.
-
-How to explain a prediction:
-
-- High `required_run_rate` and high `pressure_index` usually push probability down.
-- High `wickets_remaining` and many `balls_left` usually push probability up.
-- Team and venue features capture historical context, but they should not be overinterpreted as causal.
-
-## Flask Deployment
-
-Run:
-
-```bash
-python app.py
-```
-
-Open:
-
-```text
-http://127.0.0.1:5000
-```
-
-User inputs:
-
-- Batting Team
-- Bowling Team
-- Venue
-- Target
-- Current Score
-- Overs Completed
-- Wickets Lost
-
-Use cricket over notation in the app: `11.4` means 11 overs and 4 legal balls, not 11.4 decimal overs.
-
-Output:
-
-- Win Probability
-- Lose Probability
-- Visual probability bar
-- Key engineered features used for the prediction
+- Accuracy: overall correct win/loss classification rate.
+- Precision: among predicted winning states, how many actually became wins.
+- Recall: among actual winning chase states, how many the model identified.
+- F1 Score: balance between precision and recall.
+- ROC-AUC: how well the model ranks winning states above losing states across thresholds.
 
 ## Project Structure
 
@@ -263,32 +135,92 @@ ipl-win-predictor/
 └── README.md
 ```
 
-## Screenshots
+## How To Run
 
-After training the model and running the Flask app, add screenshots here:
+Create and activate a virtual environment:
 
-- Home form with chase input.
-- Prediction output with probability bar.
-- EDA charts from `artifacts/`.
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```powershell
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+```
+
+Add dataset files:
+
+```text
+data/raw/matches.csv
+data/raw/deliveries.csv
+```
+
+Run EDA:
+
+```powershell
+python scripts/run_eda.py
+```
+
+Train the model:
+
+```powershell
+python scripts/train.py
+```
+
+Start the Flask app:
+
+```powershell
+python app.py
+```
+
+Open:
+
+```text
+http://127.0.0.1:5000/
+```
+
+## Flask Inputs
+
+- Batting team
+- Bowling team
+- Venue
+- Target
+- Current score
+- Overs completed
+- Wickets lost
+
+Use cricket over notation: `11.4` means 11 overs and 4 legal balls.
+
+## Explainability
+
+The project saves feature importance to:
+
+```text
+artifacts/feature_importance.csv
+```
+
+If SHAP is installed and supported for the selected model, it also saves:
+
+```text
+artifacts/shap_summary.png
+```
 
 ## Future Improvements
 
-- Add player-level batter and bowler form.
-- Add venue-specific par score and chasing history.
-- Add toss, dew, season, and playoff pressure indicators.
-- Add probability calibration with reliability curves.
-- Use time-based validation by season.
-- Track model drift as new IPL seasons are added.
+- Add batter and bowler form features.
+- Add venue par score and chasing history.
+- Add toss, dew, season, and playoff-pressure indicators.
+- Add probability calibration and reliability curves.
+- Use season-wise time-based validation.
 - Add unit tests for feature calculations.
 
-## Step-by-Step Implementation
+## Interview Preparation
 
-1. Put `matches.csv` and `deliveries.csv` in `data/raw/`.
-2. Run `python scripts/run_eda.py` to generate visual evidence.
-3. Run `python scripts/train.py` to train and compare models.
-4. Read `artifacts/metrics.csv` to justify model selection.
-5. Read `artifacts/feature_importance.csv` and SHAP output to explain decisions.
-6. Run `python app.py` to start the Flask app.
-7. Discuss the project as a live ML system: data design, feature logic, leakage prevention, evaluation, explainability, and deployment.
+See:
 
-For interview questions and detailed answers, see `docs/interview_prep.md`.
+```text
+docs/interview_prep.md
+```
