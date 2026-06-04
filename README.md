@@ -210,17 +210,12 @@ artifacts/shap_summary.png
 
 ## Future Improvements
 
-- Add batter and bowler form features.
-- Add venue par score and chasing history.
-- Add toss, dew, season, and playoff-pressure indicators.
-- Add probability calibration and reliability curves.
-- Use season-wise time-based validation.
-- Add unit tests for feature calculations.
+- Add player-specific batting and bowling statistics.
+- Incorporate venue-adjusted scoring trends.
+- Add weather and match-condition features.
+- Improve probability calibration using isotonic regression.
+- Support live match data ingestion.
+- Deploy the application using Docker and cloud infrastructure..
 
-## Interview Preparation
 
-See:
-
-```text
-docs/interview_prep.md
 ```
