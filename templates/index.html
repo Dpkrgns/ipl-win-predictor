@@ -8,59 +8,100 @@
 </head>
 <body>
   <main class="shell">
-    <section class="workspace">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="IPL Win Predictor home">
+        <span class="brand-mark">IPL</span>
+        <span><strong>Win Predictor</strong><small>Second innings</small></span>
+      </a>
+      <div class="topbar-meta">IPL MATCH ANALYSIS</div>
+    </header>
+    <nav class="dashboard-nav" aria-label="Dashboard sections">
+      <a class="active" href="#match-state">Match state</a>
+      <a href="#simulator">What-if simulator</a>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <p class="eyebrow">IPL second innings</p>
+        <h1>Win probability<br><em>for the chase.</em></h1>
+        <p class="hero-copy">Enter the current score and match situation to estimate the chasing team’s chances.</p>
+      </div>
+    </section>
+
+    <section class="match-strip" aria-label="Matchup overview">
+      <div class="team-chip team-chip-batting"><span class="team-badge">BAT</span><div><small>Chasing</small><strong id="batting-team-label">{{ form_data.batting_team }}</strong></div></div>
+      <div class="versus"><span>VS</span><button type="button" class="swap-button" id="swap-teams" title="Swap batting and bowling teams" aria-label="Swap teams">&#8646;</button></div>
+      <div class="team-chip team-chip-bowling"><span class="team-badge">BOWL</span><div><small>Defending</small><strong id="bowling-team-label">{{ form_data.bowling_team }}</strong></div></div>
+      <div class="strip-stat"><small>Venue</small><strong id="venue-label">{{ form_data.venue }}</strong></div>
+    </section>
+
+    <section class="workspace" id="match-state">
       <form class="panel" method="post">
         <div class="title-row">
           <div>
-            <p class="eyebrow">Second innings model</p>
-            <h1>IPL Win Predictor</h1>
+            <p class="eyebrow">Live inputs</p>
+            <h2>Set the match state</h2>
           </div>
-          <span class="status-dot"></span>
+          <span class="model-badge">Prediction inputs</span>
+        </div>
+
+        <div class="scenario-row">
+          <span>Quick scenario</span>
+          <button type="button" class="scenario" data-scenario="powerplay">Powerplay</button>
+          <button type="button" class="scenario" data-scenario="mid-chase">Mid chase</button>
+          <button type="button" class="scenario" data-scenario="final-over">Final over</button>
         </div>
 
         <div class="grid">
-          <label>Batting Team
-            <select name="batting_team" required>
+          <label>Batting team
+            <select name="batting_team" id="batting-team" required>
               {% for team in teams %}
               <option value="{{ team }}" {% if form_data.batting_team == team %}selected{% endif %}>{{ team }}</option>
               {% endfor %}
             </select>
           </label>
 
-          <label>Bowling Team
-            <select name="bowling_team" required>
+          <label>Bowling team
+            <select name="bowling_team" id="bowling-team" required>
               {% for team in teams %}
               <option value="{{ team }}" {% if form_data.bowling_team == team %}selected{% endif %}>{{ team }}</option>
               {% endfor %}
             </select>
           </label>
 
-          <label>Venue
-            <select name="venue">
+          <label class="full-width">Venue
+            <select name="venue" id="venue">
               {% for venue in venues %}
               <option value="{{ venue }}" {% if form_data.venue == venue %}selected{% endif %}>{{ venue }}</option>
               {% endfor %}
             </select>
           </label>
 
-          <label>Target
+          <label>Target score
             <input name="target_score" type="number" min="1" max="300" value="{{ form_data.target_score }}" required>
           </label>
 
-          <label>Current Score
+          <label>Current score
             <input name="score" type="number" min="0" max="330" value="{{ form_data.score }}" required>
           </label>
 
-          <label>Overs Completed
-            <input name="overs_completed" type="number" min="0" max="20" step="0.1" value="{{ form_data.overs_completed }}" required>
+          <label>Overs completed
+            <input name="overs_completed" id="overs-completed" type="number" min="0" max="20" step="0.1" value="{{ form_data.overs_completed }}" required>
           </label>
 
-          <label>Wickets Lost
+          <label>Wickets lost
             <input name="wickets_lost" type="number" min="0" max="10" value="{{ form_data.wickets_lost }}" required>
           </label>
         </div>
 
-        <button type="submit">Predict Probability</button>
+        <div class="live-preview">
+          <div><span>RUNS LEFT</span><strong id="preview-runs">86</strong></div>
+          <div><span>BALLS LEFT</span><strong id="preview-balls">50</strong></div>
+          <div><span>REQ. RATE</span><strong id="preview-rate">10.32</strong></div>
+        </div>
+
+        <button class="primary-action" type="submit"><span>Run prediction</span><span aria-hidden="true">&#8594;</span></button>
+        <p class="form-footnote">Probability is calibrated from historical second-innings ball states.</p>
       </form>
 
       <aside class="result-panel">
@@ -69,35 +110,91 @@
         {% endif %}
 
         {% if result %}
-        <p class="eyebrow">Model output</p>
+        <div class="result-heading"><p class="eyebrow">Prediction</p></div>
         <div class="scoreline">
-          <span>{{ result.win_probability }}%</span>
-          <small>win probability</small>
+          <span>{{ result.win_probability }}<sup>%</sup></span>
+          <small>chance of a successful chase</small>
         </div>
         <div class="bar">
           <div class="win" style="width: {{ result.win_probability }}%"></div>
           <div class="lose" style="width: {{ result.lose_probability }}%"></div>
         </div>
         <div class="prob-grid">
-          <div><strong>{{ result.win_probability }}%</strong><span>Win</span></div>
-          <div><strong>{{ result.lose_probability }}%</strong><span>Lose</span></div>
+          <div><span class="prob-label"><i class="legend-dot win-dot"></i>Chasing team</span><strong>{{ result.win_probability }}%</strong></div>
+          <div><span class="prob-label"><i class="legend-dot lose-dot"></i>Defending team</span><strong>{{ result.lose_probability }}%</strong></div>
         </div>
+        <section class="why-panel" aria-label="Why this prediction">
+          <div class="why-heading"><div><span>What is affecting it?</span><small>Main factors in this match</small></div></div>
+          {% if result.explanations %}
+          <div class="why-list">
+            {% for explanation in result.explanations %}
+            <div class="why-row">
+              <div class="why-row-label"><span>{{ explanation.label }}</span><small>{{ explanation.direction }} chase</small></div>
+              <div class="why-track"><span class="why-fill {{ explanation.direction }}" style="width: {{ explanation.strength }}%"></span></div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="why-unavailable">Run training with SHAP installed to see local feature contributions for this prediction.</p>
+          {% endif %}
+        </section>
+        <section class="probability-chart" aria-label="Win probability across the innings">
+          <div class="chart-heading"><div><span>Win probability curve</span><small>Projected chase trajectory</small></div><span class="chart-live"><i></i> NOW</span></div>
+          <div class="chart-wrap">
+            <svg id="probability-graph" viewBox="0 0 620 245" role="img" aria-label="Projected win probability graph"></svg>
+          </div>
+          <div class="chart-axis"><span>0 overs</span><span>10 overs</span><span>20 overs</span></div>
+        </section>
         {% if result.decision_note %}
         <div class="decision-note">{{ result.decision_note }}</div>
         {% endif %}
+        <div class="edge-report">
+          <div class="edge-report-heading"><span>Match reading</span></div>
+          <strong>{{ result.analysis.outlook }}</strong>
+          <p>{{ result.analysis.key_signal }}. The chase is scoring at <b>{{ "%.2f"|format(result.analysis.current_rate) }}</b> runs per over and needs <b>{{ "%.2f"|format(result.analysis.required_rate) }}</b>.</p>
+        </div>
+        <div class="scenario-report">
+          <div class="metrics-title"><span>What could swing it?</span><span>Possible changes</span></div>
+          <div class="scenario-cards">
+            {% for scenario in scenario_results %}
+            <div class="scenario-card {% if loop.first %}active{% endif %}">
+              <span>{{ scenario.label }}</span>
+              <strong>{{ scenario.probability }}<sup>%</sup></strong>
+              <small>{{ scenario.caption }}</small>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="metrics-title"><span>Match state</span><span>Live snapshot</span></div>
         <dl>
-          <div><dt>Runs left</dt><dd>{{ result.features.runs_left }}</dd></div>
-          <div><dt>Balls left</dt><dd>{{ result.features.balls_left }}</dd></div>
-          <div><dt>Required RR</dt><dd>{{ "%.2f"|format(result.features.required_run_rate) }}</dd></div>
-          <div><dt>Pressure</dt><dd>{{ "%.2f"|format(result.features.pressure_index) }}</dd></div>
+          <div><dt>Runs remaining</dt><dd>{{ result.features.runs_left }}</dd></div>
+          <div><dt>Legal balls remaining</dt><dd>{{ result.features.balls_left }}</dd></div>
+          <div><dt>Required run rate</dt><dd>{{ "%.2f"|format(result.features.required_run_rate) }}</dd></div>
+          <div><dt>Pressure index</dt><dd>{{ "%.2f"|format(result.features.pressure_index) }}</dd></div>
           <div><dt>Chase progress</dt><dd>{{ "%.1f"|format(result.features.chase_progress * 100) }}%</dd></div>
         </dl>
         {% else %}
         <p class="eyebrow">Ready for a chase state</p>
-        <div class="empty-state">Train the model, enter the match situation, and the app will return calibrated win and loss probabilities.</div>
+        <div class="empty-state">Enter the live match situation to reveal the probability split, pressure index, and resources left.</div>
         {% endif %}
       </aside>
     </section>
+
+    <section class="dashboard-section simulator-section" id="simulator">
+      <div class="section-heading"><div><p class="eyebrow">Try another state</p><h2>What-if simulator</h2><p>Change one part of the match and compare the result.</p></div></div>
+      <div class="simulator-grid">
+        <div class="sim-controls">
+          <label>Score <output id="sim-score-output">{{ form_data.score }}</output><input id="sim-score" type="range" min="0" max="330" value="{{ form_data.score }}"></label>
+          <label>Overs completed <output id="sim-overs-output">{{ form_data.overs_completed }}</output><input id="sim-overs" type="range" min="0" max="120" step="1" value="{{ simulator_balls }}"></label>
+          <label>Wickets lost <output id="sim-wickets-output">{{ form_data.wickets_lost }}</output><input id="sim-wickets" type="range" min="0" max="10" value="{{ form_data.wickets_lost }}"></label>
+          <button type="button" class="sim-run" id="run-simulation"><span>Simulate state</span><span>↗</span></button>
+        </div>
+        <div class="sim-result" id="sim-result" aria-live="polite"><span class="sim-result-kicker">SIMULATED WIN PROBABILITY</span><strong>--<sup>%</sup></strong><p>Adjust the controls and run a scenario to compare a new state.</p></div>
+      </div>
+    </section>
+
   </main>
+  {% if result %}<script>window.PROBABILITY_TIMELINE = {{ result.timeline | tojson }};</script>{% endif %}
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
